@@ -4,7 +4,6 @@ from fastapi_jwt_auth import AuthJWT
 from fastapi_sqlalchemy import db
 from sqlalchemy import or_
 
-from superagi.config.config import get_config
 from superagi.models.organisation import Organisation
 from superagi.models.user import User
 from superagi.models.api_key import ApiKey
@@ -15,31 +14,20 @@ def check_auth(Authorize: AuthJWT = Depends()):
     Check user authentication using JWT.
     Skips validation in DEV environment.
     """
-    env = get_config("ENV", "DEV")
+    env = "DEV"  # Hardcoded as per your request
     if env == "PROD":
         Authorize.jwt_required()
     return Authorize
 
 
-def get_user_organisation(Authorize: AuthJWT = Depends(check_auth), request: Request = None):
-    """
-    Retrieve the organisation associated with the authenticated user.
-    """
-    user = get_current_user(Authorize, request)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Unauthenticated")
-    organisation = db.session.query(Organisation).filter(Organisation.id == user.organisation_id).first()
-    return organisation
-
-
 def get_current_user(
-    Authorize: AuthJWT = Depends(check_auth),
-    request: Request
+    request: Request,
+    Authorize: AuthJWT = Depends(check_auth)
 ):
     """
     Retrieve the current user from JWT or HTTP Basic Auth in production.
     """
-    env = get_config("ENV", "DEV")
+    env = "DEV"  # Hardcoded
 
     if env == "DEV":
         email = "super6@agi.com"
@@ -58,6 +46,20 @@ def get_current_user(
     return user
 
 
+def get_user_organisation(
+    request: Request,
+    Authorize: AuthJWT = Depends(check_auth)
+):
+    """
+    Retrieve the organisation associated with the authenticated user.
+    """
+    user = get_current_user(request, Authorize)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unauthenticated")
+    organisation = db.session.query(Organisation).filter(Organisation.id == user.organisation_id).first()
+    return organisation
+
+
 api_key_header = APIKeyHeader(name="X-API-Key")
 
 
@@ -74,7 +76,6 @@ def validate_api_key(api_key: str = Security(api_key_header)) -> str:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API Key",
         )
-
     return query_result.key
 
 
