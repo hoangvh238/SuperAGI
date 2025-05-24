@@ -1,13 +1,14 @@
-from fastapi import Depends, HTTPException, Header, Security, status, Request
+from fastapi import Depends, HTTPException, Security, status, Request
 from fastapi.security import APIKeyHeader
 from fastapi_jwt_auth import AuthJWT
 from fastapi_sqlalchemy import db
+from sqlalchemy import or_
+
 from superagi.config.config import get_config
 from superagi.models.organisation import Organisation
 from superagi.models.user import User
 from superagi.models.api_key import ApiKey
-from typing import Optional
-from sqlalchemy import or_
+
 
 def check_auth(Authorize: AuthJWT = Depends()):
     """
@@ -20,11 +21,11 @@ def check_auth(Authorize: AuthJWT = Depends()):
     return Authorize
 
 
-def get_user_organisation(Authorize: AuthJWT = Depends(check_auth)):
+def get_user_organisation(Authorize: AuthJWT = Depends(check_auth), request: Request = None):
     """
     Retrieve the organisation associated with the authenticated user.
     """
-    user = get_current_user(Authorize)
+    user = get_current_user(Authorize, request)
     if user is None:
         raise HTTPException(status_code=401, detail="Unauthenticated")
     organisation = db.session.query(Organisation).filter(Organisation.id == user.organisation_id).first()
@@ -33,7 +34,7 @@ def get_user_organisation(Authorize: AuthJWT = Depends(check_auth)):
 
 def get_current_user(
     Authorize: AuthJWT = Depends(check_auth),
-    request: Request = Depends()
+    request: Request
 ):
     """
     Retrieve the current user from JWT or HTTP Basic Auth in production.
@@ -43,7 +44,7 @@ def get_current_user(
     if env == "DEV":
         email = "super6@agi.com"
     else:
-        # In PROD: check the Authorization header
+        # In PROD: Check the Authorization header
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Basic '):
             import base64
